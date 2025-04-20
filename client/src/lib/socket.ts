@@ -1,11 +1,12 @@
 import { writable } from 'svelte/store';
 
 // Determine the server URL dynamically based on the environment
-const SERVER_URL = typeof window !== 'undefined' 
-  ? window.location.hostname === 'localhost' 
-    ? 'ws://localhost:3000'
-    : `ws://${window.location.host}`
-  : 'ws://localhost:3000';
+const SERVER_URL =
+  typeof window !== 'undefined'
+    ? window.location.hostname === 'localhost'
+      ? 'ws://localhost:3000'
+      : `ws://${window.location.host}`
+    : 'ws://localhost:3000';
 
 // WebSocket connection
 export let socket: WebSocket | null = null;
@@ -28,21 +29,21 @@ export function initializeSocket(
   // Save callbacks
   connectionStatusCallback = onStatusChange;
   transcriptionCallback = onTranscription;
-  
+
   try {
     // Create new WebSocket connection
     socket = new WebSocket(SERVER_URL);
-    
+
     // Setup event handlers
     socket.onopen = () => {
       console.log('WebSocket connected');
       if (connectionStatusCallback) connectionStatusCallback('Connected');
     };
-    
+
     socket.onclose = (event) => {
       console.log('WebSocket closed:', event.code, event.reason);
       if (connectionStatusCallback) connectionStatusCallback('Disconnected');
-      
+
       // Try to reconnect after 3 seconds
       setTimeout(() => {
         if (socket?.readyState !== WebSocket.OPEN) {
@@ -50,23 +51,23 @@ export function initializeSocket(
         }
       }, 3000);
     };
-    
+
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
       if (connectionStatusCallback) connectionStatusCallback('Error');
     };
-    
+
     socket.onmessage = (event) => {
       const transcription = event.data;
       console.log('Received transcription:', transcription);
-      
+
       // Update transcription through callback
       if (transcriptionCallback) transcriptionCallback(transcription);
-      
+
       // Update store
       currentTranscription.set(transcription);
       isFinalTranscription.set(true);
-      
+
       // Reset final flag after a delay
       setTimeout(() => {
         isFinalTranscription.set(false);
@@ -84,7 +85,7 @@ export function sendVoiceData(audioData: Blob) {
     console.warn('Cannot send audio: WebSocket not connected');
     return;
   }
-  
+
   console.log('Sending audio data to server, size:', audioData.size);
   socket.send(audioData);
 }
@@ -92,9 +93,9 @@ export function sendVoiceData(audioData: Blob) {
 // Function to save a note
 export function saveNote(text: string) {
   console.log('Saving note:', text);
-  
+
   // Add the note to local store
-  notes.update(currentNotes => {
+  notes.update((currentNotes) => {
     const newNote = {
       id: Date.now().toString(),
       text,
@@ -102,7 +103,7 @@ export function saveNote(text: string) {
     };
     return [...currentNotes, newNote];
   });
-  
+
   // Send to server via fetch API instead of WebSocket
   fetch('/api/notes', {
     method: 'POST',
@@ -110,7 +111,7 @@ export function saveNote(text: string) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ text })
-  }).catch(error => {
+  }).catch((error) => {
     console.error('Error saving note:', error);
   });
 }
