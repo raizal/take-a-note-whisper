@@ -182,30 +182,37 @@
   });
 </script>
 
-<div class="voice-recorder">
-  <div class="controls">
+<div class="w-full max-w-[600px] mx-auto my-8 p-6 rounded-lg bg-gray-50 shadow-md">
+  <div class="flex flex-col items-center gap-2 mb-4">
     {#if !isRecording}
-      <button on:click={startRecording} class="record-btn">
+      <button 
+        on:click={startRecording} 
+        class="px-6 py-3 rounded-md font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors duration-200"
+      >
         Start Recording
       </button>
     {:else}
-      <button on:click={stopRecording} class="stop-btn">
+      <button 
+        on:click={stopRecording} 
+        class="px-6 py-3 rounded-md font-semibold bg-gray-500 text-white hover:bg-gray-600 transition-colors duration-200"
+      >
         Stop Recording
       </button>
     {/if}
-    <div class="connection-status">
+    <div class="text-xs text-gray-500">
       Socket: {connectionStatus}
     </div>
   </div>
   
-  <div class="transcription-container">
+  <div class="mt-6">
     {#if isRecording || $currentTranscription}
-      <div class="transcription" class:final={$isFinalTranscription} class:recording={isRecording}>
+      <div class="p-4 bg-white rounded-md min-h-[100px] break-words whitespace-pre-wrap transition-colors duration-300 border {isRecording ? 'border-red-500' : ''} {$isFinalTranscription ? 'bg-green-50 border-green-500' : 'border-gray-200'}">
         {$currentTranscription || 'Listening...'}
       </div>
-      <div class="status">
+      <div class="flex items-center gap-2 mt-2 text-sm text-gray-500">
         {#if isRecording}
-          <span class="recording-indicator"></span> Recording
+          <span class="inline-block w-3 h-3 rounded-full bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]"></span>
+          Recording
         {:else if $isFinalTranscription}
           <span>Saving note...</span>
         {/if}
@@ -213,109 +220,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .voice-recorder {
-    width: 100%;
-    max-width: 600px;
-    margin: 2rem auto;
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    background-color: #f9fafb;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  }
-  
-  .controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 1rem;
-    gap: 0.5rem;
-  }
-  
-  .connection-status {
-    font-size: 0.75rem;
-    color: #6b7280;
-  }
-  
-  button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 0.375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  
-  .record-btn {
-    background-color: #ef4444;
-    color: white;
-  }
-  
-  .record-btn:hover {
-    background-color: #dc2626;
-  }
-  
-  .stop-btn {
-    background-color: #6b7280;
-    color: white;
-  }
-  
-  .stop-btn:hover {
-    background-color: #4b5563;
-  }
-  
-  .transcription-container {
-    margin-top: 1.5rem;
-  }
-  
-  .transcription {
-    padding: 1rem;
-    background-color: white;
-    border-radius: 0.375rem;
-    min-height: 100px;
-    border: 1px solid #e5e7eb;
-    white-space: pre-wrap;
-    word-break: break-word;
-    transition: background-color 0.3s ease;
-  }
-  
-  .transcription.final {
-    background-color: #ecfdf5;
-    border-color: #10b981;
-  }
-  
-  .transcription.recording {
-    border-color: #ef4444;
-  }
-  
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
-    color: #6b7280;
-  }
-  
-  .recording-indicator {
-    display: inline-block;
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 50%;
-    background-color: #ef4444;
-    animation: pulse 1.5s infinite;
-  }
-  
-  @keyframes pulse {
-    0% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.4;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-</style> 
