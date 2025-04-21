@@ -44,6 +44,16 @@
         e.preventDefault();
         toggleRecording();
       }
+      if (e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
+        e.preventDefault();
+        if (isRecording) {
+          stopRecording(false);
+          setTimeout(startRecording, 250);
+        } else {
+          noteContent = '';
+          adjustTextareaHeight();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -256,10 +266,13 @@
     };
   }
 
-  function stopRecording() {
+  function stopRecording(save = true) {
     ws?.close();
-    if (noteContent.trim().length > 0) {
+    if (save && noteContent.trim().length > 0) {
       saveNote();
+    } else {
+      noteContent = '';
+      adjustTextareaHeight();
     }
     isRecording = false;
     if (workletNode) {
@@ -319,7 +332,8 @@
       </div>
     </div>
     <div class="space-y-1">
-      <p class="text-sm text-gray-500">Press <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Ctrl</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Shift</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Space</kbd> to toggle recording</p>
+      <p class="text-sm text-gray-500">Press <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Ctrl</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Shift</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Space</kbd> to start & save the recording</p>
+      <p class="text-sm text-gray-500">Press <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Ctrl</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">Shift</kbd> + <kbd class="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded">C</kbd> to clear the input</p>
       <p class="text-sm text-gray-500">✨ Your notes are automatically saved in your browser's local storage</p>
     </div>
   </div>
