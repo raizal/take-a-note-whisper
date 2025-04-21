@@ -67,9 +67,9 @@
 
   let audioContext: AudioContext | null = null;
   let mediaStream: MediaStream | null = null;
-  let mediaRecorder: MediaRecorder | null = null;
-  let analyser: AnalyserNode | null = null;
   let ws: WebSocket | null = null;
+  let workletNode: AudioWorkletNode | null = null;
+  let sourceNode: MediaStreamAudioSourceNode | null = null;
   let volume = 0;
 
   const format = new Intl.DateTimeFormat(undefined, {
@@ -193,12 +193,11 @@
     URL.revokeObjectURL(url);
   }
 
-  let stream: MediaStream | null = null;
   async function startRecording() {
     isRecording = true;
-    // audioContext = new AudioContext({ sampleRate: 16000 });
 
-    // await audioContext.audioWorklet.addModule('/pcm-processor.js');
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+    await audioContext.audioWorklet.addModule('/pcm-processor.js');
 
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -207,128 +206,71 @@
         autoGainControl: true
       }
     });
-    // sourceNode = audioContext.createMediaStreamSource(mediaStream);
-    // workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
 
-    // sourceNode.connect(workletNode);
-    // workletNode.connect(audioContext.destination); // optional
+    sourceNode = audioContext.createMediaStreamSource(mediaStream);
+    workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
+
+    sourceNode.connect(workletNode);
+    // Optionally connect to destination for monitoring
+    // workletNode.connect(audioContext.destination);
+
     ws = new WebSocket(SERVER_URL);
-    // workletNode.port.onmessage = (event) => {
-    //   const msg = event.data;
-    //   if (msg.type === 'volume') {
-    //     console.log('Silent:', msg.isSilent);
-    //     // you can display a visual indicator or trigger auto-stop here
-    //   } else if (msg.type === 'audio') {
-    //     if (ws && audioContext) {
-    //       const int16View = new Int16Array(msg.pcm);
-    //       ws.send(int16View);
-    //       console.log('Received PCM buffer:', msg.samples.byteLength);
-    //     }
-    //   }
-    //   volume = msg.rms;
-    // };
-
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    
-    // Setup audio analysis
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    source.connect(analyser);
-    
-    // Create media recorder with appropriate options
-    const options = {
-      mimeType: 'audio/webm;codecs=opus',
-      audioBitsPerSecond: 16000
-    };
 
     ws.onopen = () => {
       ws?.send(JSON.stringify({
         type: 'init',
         lang: selectedLang
       }));
-      if (!mediaStream) return;
-      try {
-        mediaRecorder = new MediaRecorder(mediaStream, options);
-        console.log('MediaRecorder created with mime type:', options.mimeType);
-      } catch (e) {
-        console.warn('Failed to create MediaRecorder with these options, trying default');
-        mediaRecorder = new MediaRecorder(mediaStream);
-      }
-
-      // Setup data handling
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          console.log('Data available, size:', event.data.size);
-          // Send each chunk immediately to the server
-          ws?.send(event.data);
-        }
-        // if (event.data.size > 0 && analyser) {
-        //   // Check audio levels
-        //   const dataArray = new Float32Array(analyser.frequencyBinCount);
-        //   analyser.getFloatTimeDomainData(dataArray);
-          
-        //   // Calculate RMS
-        //   const rms = Math.sqrt(
-        //     dataArray.reduce((sum, val) => sum + val * val, 0) / dataArray.length
-        //   );
-          
-        //   // Update volume meter
-        //   volume = rms;
-
-        //   // Only send if we detect speech (RMS above threshold)
-        //   if (rms > 0.01) {
-        //     console.log('Speech detected, sending chunk. RMS:', rms);
-        //     ws?.send(event.data);
-        //   } else {
-        //     console.log('No speech detected, skipping chunk. RMS:', rms);
-        //   }
-        // }
-      };
-      // Request data frequently (every 500ms)
-      mediaRecorder.start(250);
     };
+
+    workletNode.port.onmessage = (event) => {
+      const msg = event.data;
+      if (msg.type === 'volume') {
+        volume = msg.rms;
+      } else if (msg.type === 'audio') {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          // Send raw Int16 PCM as ArrayBuffer
+          ws.send(msg.pcm);
+        }
+      }
+    };
+
     ws.onmessage = (event) => {
       console.log('WebSocket message:', event.data);
       if (typeof event.data === 'string') {
         const data = JSON.parse(event.data);
-        if (data.type === 'transcription' && data?.text?.length > 0) {  
+        if (data.type === 'transcription' && data?.text?.length > 0) {
           noteContent = data.text;
           adjustTextareaHeight();
         }
       }
     };
-    ws.onclose = () => {
-      if (noteContent.trim() !== '') {
-        saveNote();
-        console.log('Note saved:', noteContent);
-      }
-    };
   }
 
   function stopRecording() {
-    isRecording = false;
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      mediaRecorder = null;
+    ws?.close();
+    if (noteContent.trim().length > 0) {
+      saveNote();
     }
-
+    isRecording = false;
+    if (workletNode) {
+      workletNode.port.close();
+      workletNode.disconnect();
+    }
+    if (sourceNode) {
+      sourceNode.disconnect();
+    }
     if (mediaStream) {
       mediaStream.getTracks().forEach((track) => track.stop());
     }
-
-    if (audioContext && audioContext.state !== 'closed') {
+    if (audioContext) {
       audioContext.close();
     }
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-
-    // Cleanup refs
     ws = null;
     audioContext = null;
     mediaStream = null;
+    workletNode = null;
+    sourceNode = null;
     volume = 0;
   }
 </script>
