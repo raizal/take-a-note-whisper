@@ -14,7 +14,6 @@ A real-time voice transcription application that converts your speech to text no
 - **Frontend**: Svelte with TypeScript
 - **Backend**: Express.js
 - **Real-time Communication**: Socket.IO
-- **WebRTC**: simple-peer
 - **Speech-to-Text**: Groq API with OpenAI client
 
 ## Project Structure
