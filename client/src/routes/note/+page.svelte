@@ -112,7 +112,6 @@
     }
   }
 
-  
   function saveNote() {
     const newNote: Note = {
       createdAt: new Date().toISOString(),
@@ -125,6 +124,16 @@
       noteContent = '';
       adjustTextareaHeight();
     }
+  }
+
+  function deleteNote(noteId: string) {
+    notes = notes.filter(n => n.createdAt !== noteId);
+    localStorage.setItem('notes', JSON.stringify(notes));
+  }
+
+  function clearNotes() {
+    notes = [];
+    localStorage.removeItem('notes');
   }
 
   type GroupedNotes = Record<string, Note[]>;
@@ -300,6 +309,13 @@
           </svg>
           Export as Markdown
         </button>
+        <button
+          on:click={clearNotes}
+          class="flex items-center gap-1 rounded-lg border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          Clear All
+        </button>
       </div>
     </div>
     <div class="space-y-1">
@@ -363,13 +379,20 @@
       <div class="space-y-4">
         <h2 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">{day}</h2>
         {#each dayNotes as note}
-          <div class="flex flex-row items-start space-x-4 py-2">
+          <div class="flex flex-row items-start space-x-4 py-2 group">
             <time class="py-1 text-sm text-gray-500">
               {format(new Date(note.createdAt))}
             </time>
-            <p class="py-1 text-sm whitespace-pre-wrap text-gray-900">
+            <p class="py-1 text-sm whitespace-pre-wrap text-gray-900 flex-1">
               {note.note}
             </p>
+            <button
+              class="invisible group-hover:visible ml-2 flex items-center rounded-full p-1 text-gray-400 hover:text-red-500 hover:bg-red-100 transition-all"
+              title="Delete note"
+              on:click={() => deleteNote(note.createdAt)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
         {/each}
       </div>
