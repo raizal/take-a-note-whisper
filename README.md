@@ -2,6 +2,9 @@
 
 A real-time voice transcription application that converts your speech to text notes.
 
+![screenshot](./screenshots/home.png)
+
+
 ## Features
 
 - Record voice with real-time transcription using Groq API
