@@ -2,11 +2,12 @@
   import { onMount } from 'svelte';
 
   const SERVER_URL =
-    typeof window !== 'undefined'
+    process.env.SERVER_URL ||
+    (typeof window !== 'undefined'
       ? window.location.hostname === 'localhost'
         ? 'ws://localhost:3000'
         : `ws://${window.location.host}`
-      : 'ws://localhost:3000';
+      : 'ws://localhost:3000');
 
   let time = new Date();
   let noteContent = '';

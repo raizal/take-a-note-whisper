@@ -39,7 +39,7 @@ const TRANSCRIPTION_INTERVAL = 500; // 2 seconds
 
 const BATCH_SIZE = 6;
 
-const idleTimeoutMs = 750; // 0.75 second
+const idleTimeoutMs = 500; // 0.75 second
 
 // Remove empty or non-speech results with advanced filter
 const fillerPhrases = [
@@ -76,18 +76,14 @@ wss.on("connection", (ws) => {
     const currentChunks = clientData.chunks.length;
     const newChunkCount = currentChunks - clientData.lastChunkCount;
     const hasEnoughNewChunks = newChunkCount >= BATCH_SIZE;
-
     const now = Date.now();
     const idle = (now - clientData.lastChunkReceived) > idleTimeoutMs && newChunkCount > 0;
-
-    console.log(`Checking chunks - Current: ${currentChunks}, Last processed: ${clientData.lastChunkCount}`);
-
-    // Only process if we have at least 8 new chunks, or if idle and any new chunks, and not already processing
+    console.log(`Checking chunks - Current: ${currentChunks}, Last processed: ${clientData.lastChunkCount}, new chunks: ${newChunkCount}, continue? ${(hasEnoughNewChunks || idle) && !clientData.isProcessing}`);
+    // Only process if we have at least BATCH_SIZE new chunks, or if idle and any new chunks, and not already processing
     if ((hasEnoughNewChunks || idle) && !clientData.isProcessing) {
+      // Instead of moving lastChunkCount forward here, do it inside processAudioChunks after each batch
       console.log(`Processing ${newChunkCount} new chunks (${hasEnoughNewChunks ? 'threshold met' : 'idle timeout'})`);
       await processAudioChunks(clientId, ws);
-      // Move lastChunkCount forward only after successful processing
-      clientData.lastChunkCount = currentChunks;
     }
   }, TRANSCRIPTION_INTERVAL);
 
@@ -219,44 +215,42 @@ async function processAudioChunks(clientId: string, ws: any) {
   console.log('Starting chunk processing...');
   
   try {
-    // Process in batches of 8 chunks
+    // Only process if we have at least BATCH_SIZE chunks since last processed
     const unprocessedChunks = clientData.chunks.slice(clientData.lastChunkCount);
+    if (unprocessedChunks.length < BATCH_SIZE) {
+      clientData.isProcessing = false;
+      return;
+    }
     const results: (string | null)[] = [];
+    let batchesProcessed = 0;
     for (let batchStart = 0; batchStart < unprocessedChunks.length; batchStart += BATCH_SIZE) {
       const batch = unprocessedChunks.slice(batchStart, batchStart + BATCH_SIZE);
+      // Only process full batches, unless it's the last batch or we're idle
+      if (batch.length < BATCH_SIZE && unprocessedChunks.length > BATCH_SIZE && !clientData.isIdle) break;
       // Merge all chunk buffers in order
       const mergedBuffer = Buffer.concat(batch.map(chunk => chunk.data));
-      // Write merged buffer to a temp file
       const mergedFile = tmp.fileSync({ postfix: batch[0].pcm ? '.pcm' : '.webm' });
       fs.writeFileSync(mergedFile.name, mergedBuffer);
       const wavFile = tmp.fileSync({ postfix: '.wav' });
       console.log(`Converting merged batch ${batchStart / BATCH_SIZE + 1} to WAV`);
       try {
         if (batch[0].pcm) {
-          // Use ffmpeg to convert raw PCM to WAV
           await new Promise((resolve, reject) => {
             const ffmpeg = spawn('ffmpeg', [
               '-y',
-              '-f', 's16le',        // PCM format: signed 16-bit little endian
-              '-ar', '16000',       // Sample rate (match your PCM rate)
-              '-ac', '1',           // Mono audio
+              '-f', 's16le',
+              '-ar', '16000',
+              '-ac', '1',
               '-i', mergedFile.name,
               wavFile.name
             ]);
             let ffmpegError = '';
-            ffmpeg.stderr.on('data', (data) => {
-              ffmpegError += data.toString();
-            });
+            ffmpeg.stderr.on('data', (data) => { ffmpegError += data.toString(); });
             ffmpeg.on('close', (code) => {
-              if (code === 0) {
-                resolve(null);
-              } else {
-                reject(new Error(`FFmpeg PCM->WAV conversion failed with code ${code}: ${ffmpegError}`));
-              }
+              if (code === 0) { resolve(null); }
+              else { reject(new Error(`FFmpeg PCM->WAV conversion failed with code ${code}: ${ffmpegError}`)); }
             });
-            ffmpeg.on('error', (err) => {
-              reject(err);
-            });
+            ffmpeg.on('error', (err) => { reject(err); });
           });
         } else {
           await convertOpusToWav(mergedFile.name, wavFile.name);
@@ -265,12 +259,10 @@ async function processAudioChunks(clientId: string, ws: any) {
         console.log(`Transcribing merged batch ${batchStart / BATCH_SIZE + 1}`);
         const text = await transcribeAudio(wavFile.name, clientData.lang);
         console.log(`Transcription batch ${batchStart / BATCH_SIZE + 1} result: ${text}`);
-
         if (text && text.trim().length > 0 && text.trim() !== '.' && !isFiller(text)) {
           results.push(text);
         } else {
           console.log(`Batch ${batchStart / BATCH_SIZE + 1} contains no speech or is not meaningful/filler, skipping.`);
-          // If the last transcription does not end with a terminal punctuation, add a period
           if (clientData.transcription && !/[.!?]\s*$/.test(clientData.transcription.trim())) {
             clientData.transcription = clientData.transcription.trim() + '.';
           }
@@ -279,23 +271,22 @@ async function processAudioChunks(clientId: string, ws: any) {
         console.error(`Error processing merged batch ${batchStart / BATCH_SIZE + 1}:`, err);
         results.push(null);
       } finally {
-        // Clean up temp files
         mergedFile.removeCallback();
         wavFile.removeCallback();
       }
+      batchesProcessed++;
+      // Move lastChunkCount forward after each batch
+      clientData.lastChunkCount += BATCH_SIZE;
     }
-    // Merge with previous transcription
     if (!clientData.transcription) clientData.transcription = '';
     const filteredResults = results.filter(text => text !== null && text !== undefined);
     if (filteredResults.length > 0) {
       const mergedTranscription = filteredResults.join(' ');
       clientData.transcription = (clientData.transcription + ' ' + mergedTranscription).trim();
     }
-    // Send the updated transcription to the client
     if (clientData.transcription) {
       ws.send(JSON.stringify({ type: 'transcription', text: clientData.transcription }));
     }
-    
   } catch (error) {
     console.error('Error processing audio chunks:', error);
     if (error instanceof Error && error.stack) {
