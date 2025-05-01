@@ -427,7 +427,7 @@
             <time class="py-1 text-sm text-gray-500">
               {format(new Date(note.createdAt))}
             </time>
-            <p class="flex-1 py-1 text-sm whitespace-pre-wrap text-gray-900">
+            <p class="flex-1 py-1 text-sm whitespace-pre-wrap text-gray-900 break-all">
               {note.note}
             </p>
             <button
