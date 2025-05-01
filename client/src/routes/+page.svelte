@@ -432,7 +432,9 @@
             </p>
             <button
               aria-label="Delete note"
-              class="invisible ml-2 flex items-center rounded-full p-1 text-gray-400 transition-all group-hover:visible hover:bg-red-100 hover:text-red-500"
+              class="md:invisible ml-2 flex items-center 
+              rounded-full p-1 text-gray-400 transition-all
+              group-hover:visible hover:bg-red-100 hover:text-red-500"
               title="Delete note"
               on:click={() => deleteNote(note.createdAt)}
             >
